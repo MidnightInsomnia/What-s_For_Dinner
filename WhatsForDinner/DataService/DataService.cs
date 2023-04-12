@@ -1,4 +1,5 @@
 ﻿using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using System;
@@ -7,147 +8,84 @@ using System.Linq;
 using System.Reflection.PortableExecutable;
 using System.Text;
 using System.Threading.Tasks;
+using Telegram.Bot.Types;
 using WhatsForDinner.Config;
+using WhatsForDinner.DataService.Entities;
+using WhatsForDinner.DataService.Enums;
 
 namespace WhatsForDinner.DataService
 {
     public static class DataService
     {
-        public static string ConnectionString { get; set; } = "";
+        //********************************************************************//
+        //**                            CUSTOMER                            **//
+        //********************************************************************//
 
-        public static async Task InitAllUserStates()
+        public static async Task InitAllCustomerStates()
         {
-            using (SqlConnection connection = new SqlConnection(ConnectionString))
+            using (ApplicationContext db = new ApplicationContext())
             {
-                await connection.OpenAsync();
-
-                SqlCommand command = new SqlCommand();
-
-                command.Connection = connection;
-                command.CommandText = $"UPDATE CUSTOMER " +
-                                      $"SET STATEID = {(int)CustomerState.None}";
-
-                await Console.Out.WriteLineAsync($"КОРОЧЕ КОМАНДА {command.CommandText}");
-
-                await command.ExecuteNonQueryAsync();
-            }
-        }
-
-        public static async Task<int> GetLastRandomGeneratedPos(long customerID)
-        {
-            using (SqlConnection connection = new SqlConnection(ConnectionString))
-            {
-                int res = 0;
-
-                await connection.OpenAsync();
-
-                SqlCommand command = new SqlCommand();
-
-                command.Connection = connection;
-                command.CommandText = $"SELECT LASTRANDOMDISHPOS " +
-                                      $"FROM CUSTOMER " +
-                                      $"WHERE CUSTOMER.CUSTOMERID = {customerID}";
-
-                await command.ExecuteNonQueryAsync();
-
-                var reader = command.ExecuteReader();
-
-                if (reader.HasRows) // если есть данные
+                foreach (var customer in db.Customers)
                 {
-                    while (await reader.ReadAsync())
-                    {
-                        res = reader.GetInt32(0);
-                    }
+                    customer.StateID = (int)CustomerState.None;
                 }
 
-                return res;
-            }
-        }
-
-        public static async Task SetLastRandomGeneratedPos(long customerID, int Pos)
-        {
-            using (SqlConnection connection = new SqlConnection(ConnectionString))
-            {
-                await connection.OpenAsync();
-
-                SqlCommand command = new SqlCommand();
-
-                command.Connection = connection;
-                command.CommandText = $"UPDATE CUSTOMER " +
-                                      $"SET LASTRANDOMDISHPOS = {Pos} " +
-                                      $"WHERE CUSTOMER.CUSTOMERID = {customerID}";
-
-                await command.ExecuteNonQueryAsync();
+                await db.SaveChangesAsync();
             }
         }
 
         public static async Task<bool> IsCustomerExists(long customerID)
         {
-            using (SqlConnection connection = new SqlConnection(ConnectionString))
+            using (ApplicationContext db = new ApplicationContext())
             {
-                await connection.OpenAsync();
+                var customer = await db.Customers.SingleAsync(cust => cust.CustomerID == customerID);
 
-                SqlCommand command = new SqlCommand();
+                if (customer != null)
+                    Console.WriteLine($"{customer.CustomerID} \t{customer.CustomerName} \t{customer.EnterDate}");
 
-                command.Connection = connection;
-                command.CommandText = $"SELECT * FROM CUSTOMER WHERE CUSTOMERID LIKE '{customerID}'";
+                return customer != null;
+            }
+        }
 
-                var reader = command.ExecuteReader();
+        public static async Task<int> GetLastRandomDishPos(long customerID)
+        {
+            using (ApplicationContext db = new ApplicationContext())
+            {
+                int res = 0;
 
-                if (reader.HasRows) // если есть данные
-                {
-                    // выводим названия столбцов
-                    string columnName1 = reader.GetName(0);
-                    string columnName2 = reader.GetName(1);
-                    string columnName3 = reader.GetName(2);
+                var customer = await db.Customers.SingleAsync(cust => cust.CustomerID == customerID);
 
-                    Console.WriteLine($"{columnName1}\t{columnName3}\t{columnName2}");
+                if (customer != null && customer.LastRandomDishPos != null)
+                    res = (int)customer.LastRandomDishPos;
 
-                    while (await reader.ReadAsync()) // построчно считываем данные
-                    {
-                        object id = reader.GetValue(0);
-                        object name = reader.GetValue(2);
-                        object enterDate = reader.GetValue(1);
+                return res;
+            }
+        }
 
-                        Console.WriteLine($"{id} \t{name} \t{enterDate}");
-                    }
-                }
+        public static async Task SetLastRandomDishPos(long customerID, int Pos)
+        {
+            using (ApplicationContext db = new ApplicationContext())
+            {
+                var customer = db.Customers.Single(cust => cust.CustomerID == customerID);
 
-                await reader.CloseAsync();
+                if(customer != null)
+                    customer.LastRandomDishPos = Pos;
 
-                return await command.ExecuteScalarAsync() != null;
+                await db.SaveChangesAsync();
             }
         }
 
         public static async Task<CustomerState> GetCustomerState(long customerID)
         {
-            using (SqlConnection connection = new SqlConnection(ConnectionString))
+            using (ApplicationContext db = new ApplicationContext())
             {
                 var res = CustomerState.None;
-                await connection.OpenAsync();
+                //var res = from customer in db.Customers where customer.CustomerID.Equals(customerID) select customer.StateID;
 
-                SqlCommand command = new SqlCommand();
+                var customer = db.Customers.Single(cust => cust.CustomerID == customerID);
 
-                command.Connection = connection;
-                command.CommandText = $"SELECT STATEID " +
-                                      $"FROM CUSTOMER " +
-                                      $"WHERE CUSTOMER.CUSTOMERID = {customerID}";
-
-                await Console.Out.WriteLineAsync($"КОРОЧЕ КОМАНДА {command.CommandText}");
-
-                await command.ExecuteNonQueryAsync();
-
-                var reader = command.ExecuteReader();
-
-                if(reader.HasRows)
-                {
-                    while (reader.Read())
-                    {
-                        res = (CustomerState)reader.GetInt32(0);
-                    }
-                }
-
-                await reader.CloseAsync();
+                if (customer != null)
+                    res = (CustomerState)customer.StateID;
 
                 await Console.Out.WriteLineAsync($"РЕЗУЛЬТАТ STATE {res.ToString()}");
 
@@ -157,76 +95,61 @@ namespace WhatsForDinner.DataService
 
         public static async Task SetCustomerState(long customerID, CustomerState customerState)
         {
-            using (SqlConnection connection = new SqlConnection(ConnectionString))
+            using (ApplicationContext db = new ApplicationContext())
             {
-                await connection.OpenAsync();
+                var customer = db.Customers.Single(cust => cust.CustomerID == customerID);
 
-                SqlCommand command = new SqlCommand();
+                if (customer != null)
+                    customer.StateID = (int)customerState;
 
-                command.Connection = connection;
-                command.CommandText = $"UPDATE CUSTOMER " +
-                                      $"SET STATEID = {(int)customerState} " +
-                                      $"WHERE CUSTOMER.CUSTOMERID = {customerID}";
-
-                await Console.Out.WriteLineAsync($"КОРОЧЕ КОМАНДА {command.CommandText}");
-
-                await command.ExecuteNonQueryAsync();
+                await db.SaveChangesAsync();
             }
         }
 
         public static async Task AddCustomer(long customerID, string customerName, string timeStamp)
         {
-            using (SqlConnection connection = new SqlConnection(ConnectionString))
+            using (ApplicationContext db = new ApplicationContext())
             {
-                await connection.OpenAsync();
+                var newCustomer = new Customer();
 
-                SqlCommand command = new SqlCommand();
+                newCustomer.CustomerID = customerID;
+                newCustomer.CustomerName = customerName;
+                newCustomer.EnterDate = timeStamp;
+                newCustomer.LastDate = timeStamp;
 
-                command.Connection = connection;
-                command.CommandText = $"INSERT INTO CUSTOMER (CUSTOMERID,CUSTOMERNAME,ENTERDATE,LASTDATE) VALUES ({customerID}, '{customerName}', '{timeStamp}', '{timeStamp}')";
+                db.Customers.Add(newCustomer);
 
-                await Console.Out.WriteLineAsync($"КОРОЧЕ VALUES ({customerID}, {customerName}, {timeStamp}, {timeStamp}");
+                await db.SaveChangesAsync();
 
-                await command.ExecuteNonQueryAsync();
+                await Console.Out.WriteLineAsync($"КОРОЧЕ VALUES ({newCustomer.CustomerID}, {newCustomer.CustomerName}, {newCustomer.EnterDate}, {newCustomer.LastDate}");
             }
         }
 
         public static async Task DeleteCustomer(long customerID)
         {
-            using (SqlConnection connection = new SqlConnection(ConnectionString))
+            using (ApplicationContext db = new ApplicationContext())
             {
-                await connection.OpenAsync();
+                var customer = db.Customers.Single(cust => cust.CustomerID == customerID);
 
-                SqlCommand command = new SqlCommand();
+                db.Customers.Remove(customer);
 
-                command.Connection = connection;
-                command.CommandText = $"DELETE FROM CUSTOMER WHERE CUSTOMERID = {customerID}";
+                await db.SaveChangesAsync();
 
                 await Console.Out.WriteLineAsync($"CUSTOMER DELETED");
-
-                await command.ExecuteNonQueryAsync();
             }
         }
 
-        public static async Task<List<string>> GetAllCustomers()
+        public static async Task<List<string>> GetAllCustomerNames()
         {
-            using (SqlConnection connection = new SqlConnection(ConnectionString))
+            using (ApplicationContext db = new ApplicationContext())
             {
                 var clientNames = new List<string>();
 
-                await connection.OpenAsync();
-
-                SqlCommand command = new SqlCommand();
-
-                command.Connection = connection;
-                command.CommandText = "SELECT CUSTOMERNAME FROM CUSTOMER";
-                var reader = command.ExecuteReader();
-                while (reader.Read())
+                foreach (var customer in db.Customers)
                 {
-                    clientNames.Add(reader.GetString(0));
+                    if(customer.CustomerName != null)
+                        clientNames.Add(customer.CustomerName);
                 }
-
-                await reader.CloseAsync();
 
                 return clientNames;
             }
@@ -234,164 +157,79 @@ namespace WhatsForDinner.DataService
 
         public static async Task UpdateCustomerLastDate(long customerID)
         {
-            using (SqlConnection connection = new SqlConnection(ConnectionString))
+            using (ApplicationContext db = new ApplicationContext())
             {
-                await connection.OpenAsync();
+                var customer = db.Customers.Single(cust => cust.CustomerID == customerID);
 
-                SqlCommand command = new SqlCommand();
-
-                command.Connection = connection;
-                command.CommandText = $"UPDATE CUSTOMER " +
-                                      $"SET LASTDATE = '{DateTime.Now.ToString("yyyy-MM-dd HH:mm")}'" +
-                                      $"WHERE CUSTOMERID = {customerID}";
+                customer.LastDate = DateTime.Now.ToString("yyyy-MM-dd HH:mm");
+                
+                await db.SaveChangesAsync();
 
                 await Console.Out.WriteLineAsync("UPDATED");
-
-                await command.ExecuteNonQueryAsync();
             }
         }
 
-        public static async Task AddDish(string dishName, string dishDescription, string dishRecipe, string dishPhotoBase64, long ownerID)
+        //********************************************************************//
+        //**                              DISH                              **//
+        //********************************************************************//
+
+        public static async Task AddDish(Dish dish)
         {
-            using (SqlConnection connection = new SqlConnection(ConnectionString))
+            using (ApplicationContext db = new ApplicationContext())
             {
-                await connection.OpenAsync();
-
-                SqlCommand command = new SqlCommand();
-
-                command.Connection = connection;
-
-                //DISH PHOTO ВРЕМЕННО NULL
-                command.CommandText = $"INSERT INTO DISH (DISHNAME,DISHDESCRIPTION,DISHRECIPE,DISHPHOTO,CUSTOMERID) " +
-                                      $"VALUES ('{dishName}', '{dishDescription}', '{dishRecipe}', '{dishPhotoBase64}', {ownerID})";
-
-                await command.ExecuteNonQueryAsync();
-            }
-        }
-
-        public static async Task UpdateDish(int DishID, string dishName, string dishDescription, string dishRecipe, string dishPhoto, long customerID)
-        {
-            using (SqlConnection connection = new SqlConnection(ConnectionString))
-            {
-                await connection.OpenAsync();
-
-                SqlCommand command = new SqlCommand();
-
-                command.Connection = connection;
-
-                //DISH PHOTO ВРЕМЕННО NULL
-                command.CommandText = $"UPDATE DISH " +
-                                      $"SET DISHNAME = '{dishName}'," +
-                                          $"DISHDESCRIPTION = '{dishDescription}'," +
-                                          $"DISHRECIPE = '{dishRecipe}'," +
-                                          $"DISHPHOTO = NULL," +
-                                          $"CUSTOMERID = {customerID}) " +
-                                      $"WHERE DISHID = {DishID}";
-
-                await command.ExecuteNonQueryAsync();
+                db.Dishes.Add(dish);
+                await db.SaveChangesAsync();
             }
         }
 
         public static async Task<int> CountAllCustomerDishes(long customerID)
         {
             //Возвращение количества блюд пользователя
-            using (SqlConnection connection = new SqlConnection(ConnectionString))
+            using (ApplicationContext db = new ApplicationContext())
             {
-                int res = 0;
-                await connection.OpenAsync();
-
-                SqlCommand command = new SqlCommand();
-
-                command.Connection = connection;
-
-                //DISH PHOTO ВРЕМЕННО NULL
-                command.CommandText = $"SELECT COUNT(*) " +
-                                      $"FROM DISH " +
-                                      $"WHERE DISH.CUSTOMERID = {customerID}";
-
-                await Console.Out.WriteLineAsync("КОМАНДА ТИПА: " + command.CommandText);
-
-                await command.ExecuteNonQueryAsync();
-
-                var reader = command.ExecuteReader();
-
-                if (reader.HasRows)
-                {
-                    while(reader.Read())
-                    {
-                        res = reader.GetInt32(0);
-
-                    }
-                }
-
-                await reader.CloseAsync();
-
-                return res;
+                return db.Dishes.Where(dish => dish.CustomerID == customerID).ToList().Count();
             }
         }
 
         //Возвращение всех блюд
         public static async Task<List<Dish>> GetAllDishes(long customerID)
         {
-            var res = new List<Dish>();
-            using (SqlConnection connection = new SqlConnection(ConnectionString))
+            using (ApplicationContext db = new ApplicationContext())
             {
-                await connection.OpenAsync();
-
-                SqlCommand command = new SqlCommand();
-
-                command.Connection = connection;
-
-                //DISH PHOTO ВРЕМЕННО NULL
-                command.CommandText = $"SELECT * " +
-                                      $"FROM DISH " +
-                                      $"WHERE DISH.CUSTOMERID = {customerID}";
-
-                await Console.Out.WriteLineAsync("КОМАНДА ТИПА: " + command.CommandText);
-
-                await command.ExecuteNonQueryAsync();
-
-                var reader = command.ExecuteReader();
-
-                if (reader.HasRows)
-                {
-                    while (reader.Read())
-                    {
-                        var tmpDish = new Dish(reader.GetString(1));
-                        tmpDish.dishId = reader.GetInt32(0);
-                        tmpDish.dishDescription = reader.GetString(2);
-                        tmpDish.dishRecipe = reader.GetString(3);
-                        //ТЕСТ ФОТО
-                        if (!reader.IsDBNull(4))
-                            tmpDish.dishPhotoBase64 = reader.GetString(4);
-
-                        res.Add(tmpDish);
-                    }
-                }
-
-                await reader.CloseAsync();
-
-                return res;
+                return db.Dishes.Where(dish => dish.CustomerID == customerID).ToList();
             }
         }
 
-        public static async Task<List<string>> GetAllDishesOfCustomer()
+        public static async Task<Dish> GetDishById(int dishId)
         {
-            //Возвращение всех блюд конкретного пользователя
-            return new List<string>();
+            using (ApplicationContext db = new ApplicationContext())
+            {
+                var dish = await db.Dishes.SingleAsync(dish => dish.DishID == dishId);
+
+                return dish;
+            }
         }
 
-        private static byte[] ConvertVarbinaryToBytes(string varbinaryStr)
+        public static async Task DeleteDishById(int dishId)
         {
-            char[] charArray = varbinaryStr.ToCharArray();
-            byte[] byteArray = new byte[charArray.Length];
-
-            for (int i = 0; i < charArray.Length; i++)
+            using (ApplicationContext db = new ApplicationContext())
             {
-                byteArray[i] = (byte)charArray[i];
-            }
+                var dishToDelete = await db.Dishes.SingleAsync(dish => dish.DishID == dishId);
 
-            return byteArray;
+                db.Dishes.Remove(dishToDelete);
+
+                db.SaveChanges();
+            }
+        }
+
+        public static async Task UpdateDish(Dish dish)
+        {
+            using (ApplicationContext db = new ApplicationContext())
+            {
+                db.Dishes.Update(dish);
+
+                await db.SaveChangesAsync();
+            }
         }
     }
 }
