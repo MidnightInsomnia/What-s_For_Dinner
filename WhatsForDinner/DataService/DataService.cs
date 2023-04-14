@@ -80,7 +80,6 @@ namespace WhatsForDinner.DataService
             using (ApplicationContext db = new ApplicationContext())
             {
                 var res = CustomerState.None;
-                //var res = from customer in db.Customers where customer.CustomerID.Equals(customerID) select customer.StateID;
 
                 var customer = db.Customers.Single(cust => cust.CustomerID == customerID);
 

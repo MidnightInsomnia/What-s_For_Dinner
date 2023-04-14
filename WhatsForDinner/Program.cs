@@ -1,22 +1,14 @@
-﻿using Microsoft.Data.SqlClient;
-using Microsoft.Extensions.Configuration;
-using Microsoft.IdentityModel.Tokens;
-using Microsoft.VisualBasic;
-using System.Threading;
-using System.Xml.Linq;
+﻿using Microsoft.IdentityModel.Tokens;
 using Telegram.Bot;
 using Telegram.Bot.Exceptions;
 using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
-using Telegram.Bot.Types.InputFiles;
 using Telegram.Bot.Types.ReplyMarkups;
 using WhatsForDinner.Config;
 using WhatsForDinner.DataService;
 using WhatsForDinner.DataService.Entities;
 using WhatsForDinner.DataService.Enums;
-using static System.Net.Mime.MediaTypeNames;
-using static WhatsForDinner.DataService.DataService;
 
 Dictionary<long, Dish> _customerTempDishes = new Dictionary<long, Dish>();
 
@@ -60,10 +52,22 @@ async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, Cancel
 {
     try
     {
-        Console.WriteLine("КОТИК 0");
         var valid = InputCheck(botClient, update, cancellationToken).Result;
-        Console.WriteLine("КОТИК 1");
 
+        //ВОЗВРАТ ПРИ ПРОВАЛЕ ПРОВЕРКИ
+        if (!valid)
+        {
+            if (update.Message != null)
+            {
+                await botClient.SendTextMessageAsync(update.Message.Chat.Id,
+                        $"Нет такого варианта ответа",
+                        cancellationToken: cancellationToken);
+            }
+
+            return;
+        }
+
+        //ПРОВЕРКА НА КОЛИЧЕСТВО ВЛОЖЕНИЙ, ЕСЛИ БОЛЬШЕ ЧЕМ ОДНО - ОШИБКА
         if (update.Message != null)
         {
             if (update.Message.Photo != null && !update.Message.MediaGroupId.IsNullOrEmpty())
@@ -84,32 +88,13 @@ async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, Cancel
             }
         }
 
-        if (!valid)
-        {
-            Console.WriteLine("КОТИК 2");
-            if (update.Message != null)
-            {
-                Console.WriteLine("КОТИК 3");
-                await botClient.SendTextMessageAsync(update.Message.Chat.Id,
-                        $"Нет такого варианта ответа",
-                        cancellationToken: cancellationToken);
-            }
-            Console.WriteLine("КОТИК 3");
-            Console.WriteLine("ВОЗВРАТ В VALID ");
-
-            return;
-        }
-        Console.WriteLine("КОТИК 4");
         if (update.CallbackQuery != null)
         {
-            Console.WriteLine("CALLBACK ПРОЗОШЁЛ ТАК-ТО !!!!!");
             string dataStr = update.CallbackQuery.Data;
 
             if (dataStr.Contains("Edit"))
             {
                 //ПРОРВЕРКА СУЩЕСТВУЕТ ЛИ БЛЮДО, ЕСЛИ НЕТ - ОШИБКА
-                Console.WriteLine("CALLBACK EDIT ВАЩЕТА !!!!!");
-
                 int dishId = 0;
 
                 int.TryParse(dataStr.Split(' ')[1], out dishId);
@@ -146,8 +131,6 @@ async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, Cancel
             if (dataStr.Contains("Delete"))
             {
                 //ПРОРВЕРКА СУЩЕСТВУЕТ ЛИ БЛЮДО, ЕСЛИ НЕТ - ОШИБКА
-                Console.WriteLine("CALLBACK DELETE ВАЩЕТА !!!!!");
-
                 int dishId = 0;
 
                 int.TryParse(dataStr.Split(' ')[1], out dishId);
@@ -182,35 +165,23 @@ async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, Cancel
 
         try
         {
-            Console.WriteLine("КОТИК 5");
-            // Only process Message updates: https://core.telegram.org/bots/api#message
             if (update.Message is not { } message)
                 return;
-            Console.WriteLine("КОТИК 6");
+
             var customerId = update.Message.From.Id;
             var chatId = update.Message.Chat.Id;
-            Console.WriteLine("КОТИК 7");
-            var customerState = DataService.GetCustomerState(customerId).Result;
-            Console.WriteLine("КОТИК 8");
-            Console.WriteLine($"КОТИК 8.5     {message.Text == null}     PHOTO IS {message.Photo == null} MEDIA GROUP {update.Message.MediaGroupId}");
-            //ДЛЯ DISH ADDING RETURN НА ВСЕ ВИДЫ СООБЩЕНИЙ КРОМЕ PHOTO
 
+            var customerState = DataService.GetCustomerState(customerId).Result;
+            
+            //ДЛЯ DISH ADDING RETURN НА ВСЕ ВИДЫ СООБЩЕНИЙ КРОМЕ PHOTO
             if (customerState != CustomerState.AddingDishPhoto && customerState != CustomerState.EditingDishPhoto && message.Text is not { } messageText)
                 return;
-            Console.WriteLine("КОТИК 9");
-            //НЕ СЕЙЧАС
-            // Only process text messages
-            /*if (message.Text is not { } messageText)
-                return;*/
-
-            //var messageIsText = !(message.Text is not { } messageText);
 
             if (!_customerTempDishes.ContainsKey(customerId))
                 _customerTempDishes.Add(customerId, null);
 
             if(_lastWarningMessage.ContainsKey(update.Message.Chat.Id))
             {
-                await Console.Out.WriteLineAsync("ИНДУЛЬГЕНЦИЯ ПАЛУЧАИЦА");
                 _lastWarningMessage.Remove(update.Message.Chat.Id);
             }
 
@@ -590,7 +561,7 @@ async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, Cancel
                     await botClient.SendTextMessageAsync(chatId,
                         $"Если желаете, введите рецепт.",
                         cancellationToken: cancellationToken,
-                        replyMarkup: GetReplyButtons("Назад в меню", "Оставить текущий", "Без рецепта")
+                        replyMarkup: GetReplyButtons("Назад в меню", "Без рецепта", "Оставить текущий")
                         );
 
                     break;
@@ -609,11 +580,7 @@ async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, Cancel
                         _customerDishesToManipulate.Remove(customerId);
                         break;
                     }
-                    else if (message.Text.ToLower().Equals("оставить текущий"))
-                    {
-                        //ХА-ХА УБРАТЬ ЭТОТ ПОЗОР ПОТОМ
-                    }
-                    else
+                    else if(!message.Text.ToLower().Equals("оставить текущий"))
                     {
                         if (message.Text.Length > DishRecipeMaxLength)
                         {
@@ -656,7 +623,6 @@ async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, Cancel
                     if (!message.Text.IsNullOrEmpty() && message.Text.ToLower().Equals("оставить пустым"))
                     {
                         //NULL ДЛЯ PHOTO
-                        Console.WriteLine("ТИПА ОСТАВЛЯЕМ ПУСТЫМ");
                         _customerDishesToManipulate[customerId].DishPhotoBase64 = "";
                     }
 
@@ -664,7 +630,6 @@ async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, Cancel
                     {
                         if (message.Photo is not null)
                         {
-                            await Console.Out.WriteLineAsync("ТИПА НЕ NULL ");
                             //ДОБАВЛЕНИЕ ФОТО
                             var fileId = update.Message.Photo.Last().FileId;
                             var fileInfo = await botClient.GetFileAsync(fileId);
@@ -806,7 +771,7 @@ async Task OpenMenu(long chatId, long customerID, CancellationToken cancellation
             text: $"Количество блюд в вашем меню: {count} \n\n" +
                   $"1. Добавить блюдо\n" +
                   $"2. Посмотреть меню\n" +
-                  $"3. Что сегодня на ужин? 🍽",
+                  $"3. Что приготовить? 🍽",
             cancellationToken: cancellationToken,
             replyMarkup: GetReplyButtons("1", "2", "3🍽"));
 }
@@ -845,14 +810,9 @@ async Task SendDish(long chatId, Dish dish, CancellationToken cancellationToken)
 
 async Task SendRandomDish(long chatId, long customerId, CancellationToken cancellationToken)
 {
-    //ЕСЛИ БЛЮДО ТОЛЬКО ОДНО ВЫДАТЬ ОШИБКУ
     var lastPos = await DataService.GetLastRandomDishPos(customerId);
 
-    Console.WriteLine($"LAST POS {lastPos}");
-
     var dishList = await DataService.GetAllDishes(customerId);
-
-    await Console.Out.WriteLineAsync($"DISH LIST COUNT ВАЩЕТА {dishList.Count}");
 
     var randomDishNumber = GetRandomNumber(LastIndex: dishList.Count, LastGeneratedNumber: lastPos).Result;
 
@@ -872,11 +832,8 @@ async Task<int> GetRandomNumber(int LastIndex, int LastGeneratedNumber)
 
     int randomNumber = rnd.Next(0, LastIndex);
 
-    Console.WriteLine($"RND NUM {randomNumber}");
-
     if (randomNumber == LastGeneratedNumber)
     {
-        Console.WriteLine($"ЗАШЛО RND NUM {randomNumber} AND LAST {LastGeneratedNumber}");
         return GetRandomNumber(LastIndex, LastGeneratedNumber).Result;
     }
 
@@ -895,11 +852,6 @@ IReplyMarkup GetReplyButtons(params string[] buttonText)
     ReplyKeyboardMarkup replyKeyboardMarkup = new(new[]
     {
         keyboardButtons
-        /*new KeyboardButton[]
-        { "1",
-          "2",
-          "3⚡️"
-        },*/
     })
     {
         //Изменяет размер кнопки относительно размера элемента
@@ -907,26 +859,6 @@ IReplyMarkup GetReplyButtons(params string[] buttonText)
     };
 
     return replyKeyboardMarkup;
-
-    //INLINE BUTTONS
-
-    /*InlineKeyboardMarkup inlineKeyboard = new(new[]
-    {
-        // first row
-        new []
-        {
-            InlineKeyboardButton.WithCallbackData(text: "1", callbackData: "11"),
-            InlineKeyboardButton.WithCallbackData(text: "2", callbackData: "12"),
-        },
-        // second row
-        new []
-        {
-            InlineKeyboardButton.WithCallbackData(text: "3", callbackData: "21"),
-            InlineKeyboardButton.WithCallbackData(text: "2.2", callbackData: "22"),
-        },
-    });
-
-    return inlineKeyboard;*/
 }
 
 IReplyMarkup GetInlineButtons(string callBackText)

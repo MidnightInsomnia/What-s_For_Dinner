@@ -17,12 +17,6 @@ namespace WhatsForDinner.DataService.Enums
         AddingDishRecipe,
         AddingDishPhoto,
 
-        DeletingDish,
-
-        //DISH LIST & RANDOM
-        WatchingDishList,
-        RandomDishGenerating,
-        
         //DISH EDIT
         EditingDishName,
         EditingDishDescription,
@@ -30,5 +24,9 @@ namespace WhatsForDinner.DataService.Enums
         EditingDishPhoto,
 
         DeleteDishConfirmation,
+
+        //DISH LIST & RANDOM
+        WatchingDishList,
+        RandomDishGenerating,
     }
 }
