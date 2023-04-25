@@ -7,11 +7,11 @@
 ## Меню
 Используйте меню для редактирования или удаления своих блюд <br>
 
-![image](https://user-images.githubusercontent.com/61066851/234340633-da7ac658-d7fa-4a5f-8342-e4761bf612a8.png)
+![image](https://user-images.githubusercontent.com/61066851/234410865-e660807f-c65f-440f-8b9c-3683a00ec124.png)
 
 
 ## Что приготовить?
 Случайный выбор блюда для готовки из вашего меню <br>
 
-![image](https://user-images.githubusercontent.com/61066851/234341964-d746dd98-90d7-41cb-b6a0-a52fde188986.png)
+![image](https://user-images.githubusercontent.com/61066851/234411092-180242e8-de4b-41c0-a054-ab72b44089ea.png)
 
