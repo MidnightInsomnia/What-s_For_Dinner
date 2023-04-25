@@ -1,21 +1,15 @@
-﻿using Microsoft.Data.SqlClient;
-using Microsoft.Extensions.Configuration;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using Microsoft.Extensions.Configuration;
 
-namespace WhatsForDinner.Config
+namespace WhatsForDinner.Config;
+
+//Единственная функция - добавляет sectets.json в config
+public static class DinnerConfig
 {
-    public static class DinnerConfig
+    public static IConfiguration AppConfiguration { get; private set; }
+    public static void Initiation()
     {
-        public static IConfiguration AppConfiguration { get; private set; }
-        public static void Initiation()
-        {
-            AppConfiguration = new ConfigurationBuilder()
-                .AddUserSecrets<Program>()
-                .Build();
-        }
+        AppConfiguration = new ConfigurationBuilder()
+            .AddUserSecrets<Program>()
+            .Build();
     }
 }

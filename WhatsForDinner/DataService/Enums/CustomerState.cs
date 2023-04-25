@@ -14,13 +14,13 @@ namespace WhatsForDinner.DataService.Enums
         //DISH ADD
         AddingDishName,
         AddingDishDescription,
-        AddingDishRecipe,
+        AddingDishDayTime,
         AddingDishPhoto,
 
         //DISH EDIT
         EditingDishName,
         EditingDishDescription,
-        EditingDishRecipe,
+        EditingDishDayTime,
         EditingDishPhoto,
 
         DeleteDishConfirmation,

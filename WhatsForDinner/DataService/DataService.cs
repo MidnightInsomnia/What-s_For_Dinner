@@ -21,6 +21,9 @@ namespace WhatsForDinner.DataService
         //**                            CUSTOMER                            **//
         //********************************************************************//
 
+        /// <summary>
+        /// При запуске присваивает всем пользователям нейтральное состояние
+        /// </summary>
         public static async Task InitAllCustomerStates()
         {
             using (ApplicationContext db = new ApplicationContext())
@@ -34,11 +37,16 @@ namespace WhatsForDinner.DataService
             }
         }
 
+        /// <summary>
+        /// Проверяет есть ли пользователь в базе
+        /// </summary>
+        /// <param name="customerID">ID пользователя в базе</param>
+        /// <returns>True - если пользователь в базе; False - если нет</returns>
         public static async Task<bool> IsCustomerExists(long customerID)
         {
             using (ApplicationContext db = new ApplicationContext())
             {
-                var customer = await db.Customers.SingleAsync(cust => cust.CustomerID == customerID);
+                var customer = await db.Customers.FirstOrDefaultAsync(cust => cust.CustomerID == customerID);
 
                 if (customer != null)
                     Console.WriteLine($"{customer.CustomerID} \t{customer.CustomerName} \t{customer.EnterDate}");
@@ -47,13 +55,18 @@ namespace WhatsForDinner.DataService
             }
         }
 
+        /// <summary>
+        /// Получает ID последнего рандомного блюда, нужен для отсутствия повторной генерации
+        /// </summary>
+        /// <param name="customerID">ID пользователя в базе</param>
+        /// <returns>int ID блюда, по-умолчанию: 0</returns>
         public static async Task<int> GetLastRandomDishPos(long customerID)
         {
             using (ApplicationContext db = new ApplicationContext())
             {
                 int res = 0;
 
-                var customer = await db.Customers.SingleAsync(cust => cust.CustomerID == customerID);
+                var customer = await db.Customers.FirstOrDefaultAsync(cust => cust.CustomerID == customerID);
 
                 if (customer != null && customer.LastRandomDishPos != null)
                     res = (int)customer.LastRandomDishPos;
@@ -62,29 +75,37 @@ namespace WhatsForDinner.DataService
             }
         }
 
+        /// <summary>
+        /// Обновляет ID последнего рандомного блюда в базе
+        /// </summary>
+        /// <param name="customerID">ID пользователя в базе</param>
+        /// <param name="Pos">значение параметра</param>
         public static async Task SetLastRandomDishPos(long customerID, int Pos)
         {
             using (ApplicationContext db = new ApplicationContext())
             {
-                var customer = db.Customers.Single(cust => cust.CustomerID == customerID);
+                var customer = db.Customers.FirstOrDefaultAsync(cust => cust.CustomerID == customerID).Result;
 
-                if(customer != null)
-                    customer.LastRandomDishPos = Pos;
+                if(customer != null) customer.LastRandomDishPos = Pos;
 
                 await db.SaveChangesAsync();
             }
         }
 
+        /// <summary>
+        /// Получает текущее состояние пользователя
+        /// </summary>
+        /// <param name="customerID">ID пользователя в базе</param>
+        /// <returns>Экземпляр CustomerState, с информацией о состоянии</returns>
         public static async Task<CustomerState> GetCustomerState(long customerID)
         {
             using (ApplicationContext db = new ApplicationContext())
             {
                 var res = CustomerState.None;
 
-                var customer = db.Customers.Single(cust => cust.CustomerID == customerID);
+                var customer = db.Customers.FirstOrDefaultAsync(cust => cust.CustomerID == customerID).Result;
 
-                if (customer != null)
-                    res = (CustomerState)customer.StateID;
+                if (customer != null) res = (CustomerState)customer.StateID;
 
                 await Console.Out.WriteLineAsync($"РЕЗУЛЬТАТ STATE {res.ToString()}");
 
@@ -92,19 +113,29 @@ namespace WhatsForDinner.DataService
             }
         }
 
+        /// <summary>
+        /// Обновляет текущее состояние пользователя в базе
+        /// </summary>
+        /// <param name="customerID">ID пользователя в базе</param>
+        /// <param name="customerState">состояние пользователя</param>
         public static async Task SetCustomerState(long customerID, CustomerState customerState)
         {
             using (ApplicationContext db = new ApplicationContext())
             {
-                var customer = db.Customers.Single(cust => cust.CustomerID == customerID);
+                var customer = db.Customers.FirstOrDefaultAsync(cust => cust.CustomerID == customerID).Result;
 
-                if (customer != null)
-                    customer.StateID = (int)customerState;
+                if (customer != null) customer.StateID = (int)customerState;
 
                 await db.SaveChangesAsync();
             }
         }
 
+        /// <summary>
+        /// Добавляет пользователя в базу
+        /// </summary>
+        /// <param name="customerID">ID пользователя в базе</param>
+        /// <param name="customerName">Никнейм пользователя</param>
+        /// <param name="timeStamp">Дата и время добавления</param>
         public static async Task AddCustomer(long customerID, string customerName, string timeStamp)
         {
             using (ApplicationContext db = new ApplicationContext())
@@ -124,13 +155,17 @@ namespace WhatsForDinner.DataService
             }
         }
 
+        /// <summary>
+        /// Удаляет пользователя из базы
+        /// </summary>
+        /// <param name="customerID">ID пользователя в базе</param>
         public static async Task DeleteCustomer(long customerID)
         {
             using (ApplicationContext db = new ApplicationContext())
             {
-                var customer = db.Customers.Single(cust => cust.CustomerID == customerID);
+                var customer = db.Customers.FirstOrDefaultAsync(cust => cust.CustomerID == customerID).Result;
 
-                db.Customers.Remove(customer);
+                if(customer != null) db.Customers.Remove(customer);
 
                 await db.SaveChangesAsync();
 
@@ -138,6 +173,10 @@ namespace WhatsForDinner.DataService
             }
         }
 
+        /// <summary>
+        /// Получает все никнеймы пользователей из базы
+        /// </summary>
+        /// <returns>Список с именами пользователей</returns>
         public static async Task<List<string>> GetAllCustomerNames()
         {
             using (ApplicationContext db = new ApplicationContext())
@@ -154,13 +193,17 @@ namespace WhatsForDinner.DataService
             }
         }
 
+        /// <summary>
+        /// Обновляет дату последнего использования бота в базе
+        /// </summary>
+        /// <param name="customerID">ID пользователя в базе</param>
         public static async Task UpdateCustomerLastDate(long customerID)
         {
             using (ApplicationContext db = new ApplicationContext())
             {
-                var customer = db.Customers.Single(cust => cust.CustomerID == customerID);
+                var customer = db.Customers.FirstOrDefaultAsync(cust => cust.CustomerID == customerID).Result;
 
-                customer.LastDate = DateTime.Now.ToString("yyyy-MM-dd HH:mm");
+                if(customer!= null) customer.LastDate = DateTime.Now.ToString("yyyy-MM-dd HH:mm");
                 
                 await db.SaveChangesAsync();
 
@@ -172,6 +215,10 @@ namespace WhatsForDinner.DataService
         //**                              DISH                              **//
         //********************************************************************//
 
+        /// <summary>
+        /// Добавляет новое блюдо в базу
+        /// </summary>
+        /// <param name="dish">Экземпляр с информацией о новом блюде</param>
         public static async Task AddDish(Dish dish)
         {
             using (ApplicationContext db = new ApplicationContext())
@@ -181,6 +228,11 @@ namespace WhatsForDinner.DataService
             }
         }
 
+        /// <summary>
+        /// Считает количество блюд пользователя в базе
+        /// </summary>
+        /// <param name="customerID">ID пользователя в базе</param>
+        /// <returns>int с количеством блюд пользователя</returns>
         public static async Task<int> CountAllCustomerDishes(long customerID)
         {
             //Возвращение количества блюд пользователя
@@ -190,7 +242,11 @@ namespace WhatsForDinner.DataService
             }
         }
 
-        //Возвращение всех блюд
+        /// <summary>
+        /// Получает в базе список всех блюд пользователя
+        /// </summary>
+        /// <param name="customerID">ID пользователя в базе</param>
+        /// <returns>Список со всеми экземплярами Dish принадлежащих пользователю</returns>
         public static async Task<List<Dish>> GetAllDishes(long customerID)
         {
             using (ApplicationContext db = new ApplicationContext())
@@ -199,21 +255,30 @@ namespace WhatsForDinner.DataService
             }
         }
 
+        /// <summary>
+        /// Получает блюдо по его ID
+        /// </summary>
+        /// <param name="dishId">ID блюда в базе</param>
+        /// <returns>Экземпляр блюда из базы, null если блюдо не существует</returns>
         public static async Task<Dish> GetDishById(int dishId)
         {
             using (ApplicationContext db = new ApplicationContext())
             {
-                var dish = await db.Dishes.SingleAsync(dish => dish.DishID == dishId);
+                var dish = await db.Dishes.FirstOrDefaultAsync(dish => dish.DishID == dishId);
 
                 return dish;
             }
         }
 
+        /// <summary>
+        /// Удаляет блюдо по его ID
+        /// </summary>
+        /// <param name="dishId">ID блюда в базе</param>
         public static async Task DeleteDishById(int dishId)
         {
             using (ApplicationContext db = new ApplicationContext())
             {
-                var dishToDelete = await db.Dishes.SingleAsync(dish => dish.DishID == dishId);
+                var dishToDelete = await db.Dishes.FirstOrDefaultAsync(dish => dish.DishID == dishId);
 
                 db.Dishes.Remove(dishToDelete);
 
@@ -221,6 +286,10 @@ namespace WhatsForDinner.DataService
             }
         }
 
+        /// <summary>
+        /// Обновляет блюдо в базе
+        /// </summary>
+        /// <param name="dish">Обновлённый экземпляр блюда</param>
         public static async Task UpdateDish(Dish dish)
         {
             using (ApplicationContext db = new ApplicationContext())

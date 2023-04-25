@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 
 namespace WhatsForDinner.DataService.Entities
 {
+    //Модель для сущности Customer
     [Table("Customer")]
     public class Customer
     {

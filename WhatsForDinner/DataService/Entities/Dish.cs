@@ -16,7 +16,7 @@ namespace WhatsForDinner.DataService.Entities
         public int DishID { get; set; }
         public string DishName { get; set; } = "";
         public string? DishDescription { get; set; } = "";
-        public string? DishRecipe { get; set; } = "";
+        public int DishDayTimeID { get; set; }
         public string? DishPhotoBase64 { get; set; } = "";
         public long CustomerID { get; set; }
     }
