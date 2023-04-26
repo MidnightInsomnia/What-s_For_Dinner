@@ -135,8 +135,8 @@ namespace WhatsForDinner.DialogService
             {
                 DialogService._customerTempDishes.Add(customerId, dishToEdit);
                 await DataService.DataService.SetCustomerState(customerId, CustomerState.EditingDishName);
-                await messageSender.SendMessageAsync($"Начинаем редактирование блюда {dishToEdit.DishName}");
-                await messageSender.SendMessageWithButtonsAsync("Введите название блюда", "Назад в меню", dishToEdit.DishName);
+
+                await messageSender.SendNextStage(CustomerState.EditingDishName, dishToEdit.DishName);
             }
 
             if (data.Contains("Delete"))
@@ -144,7 +144,7 @@ namespace WhatsForDinner.DialogService
                 await DataService.DataService.SetCustomerState(customerId, CustomerState.DeleteDishConfirmation);
                 DialogService._customerTempDishes.Add(customerId, dishToEdit);
 
-                await messageSender.SendMessageWithButtonsAsync($"Вы уверены, что хотите удалить {dishToEdit.DishName}?", "Нет", "Да");
+                await messageSender.SendNextStage(CustomerState.DeleteDishConfirmation, dishToEdit.DishName);
             }
         }
         public static async void StartCommand(long customerId, string userName, MessageSender messageSender)
@@ -175,8 +175,7 @@ namespace WhatsForDinner.DialogService
             {
                 await DataService.DataService.SetCustomerState(customerId, CustomerState.AddingDishName);
 
-                await messageSender.SendMessageWithButtonsAsync("Введите название блюда", "Назад в меню");
-
+                await messageSender.SendNextStage(CustomerState.AddingDishName);
                 return;
             }
 
@@ -190,14 +189,7 @@ namespace WhatsForDinner.DialogService
 
                 await DataService.DataService.SetCustomerState(customerId, CustomerState.WatchingDishList);
 
-                var dishList = await DataService.DataService.GetAllDishes(customerId);
-
-                await messageSender.SendMessageWithButtonsAsync("Ваши блюда:", "Назад в меню");
-
-                foreach (var item in dishList)
-                {
-                    await messageSender.SendDish(item);
-                }
+                await messageSender.SendNextStage(CustomerState.WatchingDishList);
                 return;
             }
 
@@ -211,8 +203,7 @@ namespace WhatsForDinner.DialogService
 
                 await DataService.DataService.SetCustomerState(customerId, CustomerState.RandomDishGenerating);
 
-                await messageSender.SendRandomDish();
-
+                await messageSender.SendNextStage(CustomerState.RandomDishGenerating);
                 return;
             }
 
@@ -234,14 +225,12 @@ namespace WhatsForDinner.DialogService
             if (isNewDish)
             {
                 await DataService.DataService.SetCustomerState(customerId, CustomerState.AddingDishDescription);
-
-                await messageSender.SendMessageWithButtonsAsync("Введите описание блюда", "Назад в меню", "Оставить пустым");
+                await messageSender.SendNextStage(CustomerState.AddingDishDescription);
             }
             else
             {
                 await DataService.DataService.SetCustomerState(customerId, CustomerState.EditingDishDescription);
-
-                await messageSender.SendMessageWithButtonsAsync("Введите описание блюда", "Назад в меню", "Оставить пустым", "Оставить текущее");
+                await messageSender.SendNextStage(CustomerState.EditingDishDescription);
             }
         }
         public static async void OnDishDescriptionEdit(long customerId, string message, MessageSender messageSender, bool isNewDish)
@@ -272,12 +261,17 @@ namespace WhatsForDinner.DialogService
             }
 
             if (isNewDish)
+            {
                 await DataService.DataService.SetCustomerState(customerId, CustomerState.AddingDishDayTime);
+                await messageSender.SendNextStage(CustomerState.AddingDishDayTime);
+            }
+                
 
             if (!isNewDish)
+            {
                 await DataService.DataService.SetCustomerState(customerId, CustomerState.EditingDishDayTime);
-
-            await messageSender.SendMessageWithButtonsAsync("Выберите приём пищи", "Любой", "Завтрак", "Обед", "Ужин");
+                await messageSender.SendNextStage(CustomerState.EditingDishDayTime);
+            }
         }
         public static async void OnDishDayTimeEdit(long customerId, string message, MessageSender messageSender, bool isNewDish)
         {
@@ -299,6 +293,14 @@ namespace WhatsForDinner.DialogService
                     _customerTempDishes[customerId].DishDayTimeID = (int)DishDayTime.Dinner;
                     break;
 
+                case "оставить текущий":
+                    if (isNewDish)
+                    {
+                        await messageSender.SendError("Нет такого варианта ответа.");
+                        return;
+                    }
+                    break;
+
                 default:
                     await messageSender.SendError("Нет такого варианта ответа.");
                     return;
@@ -307,13 +309,13 @@ namespace WhatsForDinner.DialogService
             if (isNewDish)
             {
                 await DataService.DataService.SetCustomerState(customerId, CustomerState.AddingDishPhoto);
-                await messageSender.SendMessageWithButtonsAsync("Добавьте фото.", "Назад в меню", "Без фото");
+                await messageSender.SendNextStage(CustomerState.AddingDishPhoto);
             }
 
             if (!isNewDish)
             {
                 await DataService.DataService.SetCustomerState(customerId, CustomerState.EditingDishPhoto);
-                await messageSender.SendMessageWithButtonsAsync("Добавьте фото.", "Назад в меню", "Без фото", "Оставить текущее");
+                await messageSender.SendNextStage(CustomerState.EditingDishPhoto);
             }
         }
         public static async void OnDishPhotoEdit(long customerId, Message message, MessageSender messageSender, MessageReciever messageReciever, bool isNewDish)
@@ -348,6 +350,10 @@ namespace WhatsForDinner.DialogService
                 DialogService._customerTempDishes[customerId].DishPhotoBase64 = await messageReciever.TelegramPhotoToBase64(message.Photo);
             }
 
+            EndDishEditing(customerId, messageSender, isNewDish);
+        }
+        public static async void EndDishEditing(long customerId, MessageSender messageSender, bool isNewDish)
+        {
             if (isNewDish)
             {
                 DialogService._customerTempDishes[customerId].CustomerID = customerId;

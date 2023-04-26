@@ -1,6 +1,7 @@
 ﻿using Microsoft.IdentityModel.Tokens;
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -43,6 +44,14 @@ namespace WhatsForDinner.MessageService
                 messageText,
                 cancellationToken: CancellationToken,
                 replyMarkup: GetReplyButtons(replyButtonText));
+        }
+
+        public async Task SendMessageWithButtonGridAsync(int elementInRow, string messageText, params string[] replyButtonText)
+        {
+            await BotClient.SendTextMessageAsync(ChatId,
+                messageText,
+                cancellationToken: CancellationToken,
+                replyMarkup: GetReplyButtons(elementInRow, replyButtonText));
         }
 
         public async Task SendError(string messageText)
@@ -116,39 +125,64 @@ namespace WhatsForDinner.MessageService
             await SendDish(dishList[randomDishNumber]);
         }
 
-        public async Task SendNextStage(CustomerState nextStage)
+        public async Task SendNextStage(CustomerState nextStage, params string[] args)
         {
             switch (nextStage)
             {
-                case CustomerState.Menu:
-                    break;
-
                 //DISH ADD
                 case CustomerState.AddingDishName:
+                    await SendMessageWithButtonsAsync("Введите название блюда", "Назад в меню");
                     break;
+
                 case CustomerState.AddingDishDescription:
+                    await SendMessageWithButtonsAsync("Введите описание блюда", "Назад в меню", "Оставить пустым");
                     break;
+
                 case CustomerState.AddingDishDayTime:
+                    await SendMessageWithButtonsAsync("Выберите приём пищи", "Любой", "Завтрак", "Обед", "Ужин");
                     break;
+
                 case CustomerState.AddingDishPhoto:
+                    await SendMessageWithButtonsAsync("Добавьте фото.", "Назад в меню", "Без фото");
                     break;
+
                 //DISH EDIT
                 case CustomerState.EditingDishName:
+                    await SendMessageAsync($"Начинаем редактирование блюда {args[0]}");
+                    await SendMessageWithButtonsAsync("Введите название блюда", "Назад в меню", args[0]);
                     break;
+
                 case CustomerState.EditingDishDescription:
+                    await SendMessageWithButtonsAsync("Введите описание блюда", "Назад в меню", "Оставить пустым", "Оставить текущее");
                     break;
+
                 case CustomerState.EditingDishDayTime:
+                    await SendMessageWithButtonGridAsync(2, "Выберите приём пищи", "Любой", "Завтрак", "Обед", "Ужин", "Оставить текущий");
                     break;
+
                 case CustomerState.EditingDishPhoto:
+                    await SendMessageWithButtonsAsync("Добавьте фото.", "Назад в меню", "Без фото", "Оставить текущее");
                     break;
 
                 case CustomerState.DeleteDishConfirmation:
+                    await SendMessageWithButtonsAsync($"Вы уверены, что хотите удалить {args[0]}?", "Нет", "Да");
                     break;
 
                 //DISH LIST & RANDOM
                 case CustomerState.WatchingDishList:
+
+                    var dishList = await DataService.DataService.GetAllDishes(CustomerId);
+
+                    await SendMessageWithButtonsAsync("Ваши блюда:", "Назад в меню");
+
+                    foreach (var item in dishList)
+                    {
+                        await SendDish(item);
+                    }
                     break;
+
                 case CustomerState.RandomDishGenerating:
+                    await SendRandomDish();
                     break;
             }
         }
@@ -166,6 +200,44 @@ namespace WhatsForDinner.MessageService
             {
                 keyboardButtons
             })
+            {
+                //Изменяет размер кнопки относительно размера элемента
+                ResizeKeyboard = true
+            };
+
+            return replyKeyboardMarkup;
+        }
+
+        IReplyMarkup GetReplyButtons(int columnCount, params string[] buttonText)
+        {
+            var rowCount = (int)decimal.Round((buttonText.Length / columnCount) + 1, 0, MidpointRounding.AwayFromZero);
+
+            KeyboardButton[] keyboardButtons = new KeyboardButton[buttonText.Length];
+
+            for (int i = 0; i < buttonText.Length; i++)
+            {
+                keyboardButtons[i] = new KeyboardButton(buttonText[i]);
+            }
+
+            KeyboardButton[][] keyboardRows = new KeyboardButton[rowCount][];
+
+            var tmpCount = columnCount;
+
+            //Распиливаем массив с кнопками на куски, отрезаем столько элементов, сколько должно быть в строке
+            for (int j = 0; j < rowCount; j++)
+            {
+                if (j == 0)
+                {
+                    keyboardRows[j] = keyboardButtons.Take(tmpCount).ToArray();
+                }
+                else
+                {
+                    keyboardRows[j] = keyboardButtons.Skip(tmpCount).Take(columnCount).ToArray();
+                    tmpCount += columnCount;
+                }
+            }
+
+            ReplyKeyboardMarkup replyKeyboardMarkup = new(keyboardRows)
             {
                 //Изменяет размер кнопки относительно размера элемента
                 ResizeKeyboard = true
